@@ -1,0 +1,646 @@
+{
+  "datasets": [
+    {
+      "name": "cc2ebcbf",
+      "displayName": "hn_yearly_trends_unified",
+      "config": {
+        "version": "1.1",
+        "source": "job_market.gold.hn_yearly_trends_unified",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "8b63e626",
+      "displayName": "hn_skill_trends_unified",
+      "config": {
+        "version": "1.1",
+        "source": "job_market.gold.hn_skill_trends_unified",
+        "dimensions": [
+          {
+            "expr": "source.*"
+          }
+        ],
+        "measures": [
+          {
+            "name": "count",
+            "expr": "COUNT(*)",
+            "comment": "Represents the total number of rows in the dataset. Use this measure to count all",
+            "displayName": "Count"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ddf73cce",
+      "displayName": "Top Trending Skills in Job Posts from 2018 to 2025",
+      "queryLines": [
+        "\r\n",
+        "SELECT\r\n",
+        "    skill,\r\n",
+        "    SUM(total_posts) AS mentions\r\n",
+        "FROM job_market.gold.hn_skill_trends_unified\r\n",
+        "WHERE posted_year BETWEEN 2018 AND 2025\r\n",
+        "GROUP BY skill\r\n",
+        "ORDER BY mentions DESC\r\n",
+        "LIMIT 10;\r\n"
+      ]
+    },
+    {
+      "name": "856d73e4",
+      "displayName": "top7_skills_other_by_year",
+      "queryLines": [
+        "\r\n",
+        "WITH ranked AS (\r\n",
+        "    SELECT\r\n",
+        "        posted_year,\r\n",
+        "        skill,\r\n",
+        "        total_posts,\r\n",
+        "\r\n",
+        "        ROW_NUMBER() OVER (\r\n",
+        "            PARTITION BY posted_year\r\n",
+        "            ORDER BY total_posts DESC, skill ASC\r\n",
+        "        ) AS rn\r\n",
+        "\r\n",
+        "    FROM job_market.gold.hn_skill_trends_unified\r\n",
+        "),\r\n",
+        "\r\n",
+        "grouped AS (\r\n",
+        "    SELECT\r\n",
+        "        posted_year,\r\n",
+        "\r\n",
+        "        CASE\r\n",
+        "            WHEN rn <= 5 THEN skill\r\n",
+        "            ELSE 'Other'\r\n",
+        "        END AS skill,\r\n",
+        "\r\n",
+        "        SUM(total_posts) AS total_posts\r\n",
+        "\r\n",
+        "    FROM ranked\r\n",
+        "\r\n",
+        "    GROUP BY\r\n",
+        "        posted_year,\r\n",
+        "        CASE\r\n",
+        "            WHEN rn <= 5 THEN skill\r\n",
+        "            ELSE 'Other'\r\n",
+        "        END\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT *\r\n",
+        "FROM grouped\r\n",
+        "ORDER BY posted_year, total_posts DESC;\r\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "b3fe53f3",
+      "displayName": "Tech Job Market Evolution",
+      "layout": [
+        {
+          "widget": {
+            "name": "hacker-news-hiring-posts-by-year-2011-2026",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc2ebcbf",
+                  "fields": [
+                    {
+                      "name": "posted_year",
+                      "expression": "`posted_year`"
+                    },
+                    {
+                      "name": "sum(total_posts)",
+                      "expression": "SUM(`total_posts`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Hacker News Hiring Posts by Year (2011–2026)",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "posted_year",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "all"
+                    },
+                    "hideGroupSeparator": true
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(total_posts)",
+                  "axis": {
+                    "title": "total_posts"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "remote-work-trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc2ebcbf",
+                  "fields": [
+                    {
+                      "name": "posted_year",
+                      "expression": "`posted_year`"
+                    },
+                    {
+                      "name": "sum(remote_percentage_known)",
+                      "expression": "SUM(`remote_percentage_known`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Remote Work Trend",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "posted_year",
+                  "displayName": "posted_year",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(remote_percentage_known)",
+                  "displayName": "Remote (%)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "skill-coverage-by-year",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc2ebcbf",
+                  "fields": [
+                    {
+                      "name": "posted_year",
+                      "expression": "`posted_year`"
+                    },
+                    {
+                      "name": "avg(skills_coverage_percentage)",
+                      "expression": "AVG(`skills_coverage_percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Skill Coverage by Year",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "lineShape": "linear",
+                "size": 0
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "posted_year",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(skills_coverage_percentage)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Skill Coverage (%)",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "type": "custom",
+                      "min": 0,
+                      "max": 100
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 6,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "top-10-technologies-2018-2025",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ddf73cce",
+                  "fields": [
+                    {
+                      "name": "skill",
+                      "expression": "`skill`"
+                    },
+                    {
+                      "name": "sum(mentions)",
+                      "expression": "SUM(`mentions`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Top 10 Technologies (2018–2025)",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "skill",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(mentions)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "c846d969",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "7e8de646",
+            "spec": {
+              "encodings": {
+                "fields": []
+              },
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "3f725969",
+      "displayName": "Skills Explorer",
+      "layout": [
+        {
+          "widget": {
+            "name": "b1bcda3b",
+            "queries": [
+              {
+                "name": "dashboards/01f1d0c0cb7716499624e92ec0c4a422/datasets/01f1d0c141e21ee8bcdc65102ea1ae00_posted_year",
+                "query": {
+                  "datasetName": "8b63e626",
+                  "fields": [
+                    {
+                      "name": "posted_year",
+                      "expression": "`posted_year`"
+                    },
+                    {
+                      "name": "posted_year_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    },
+                    {
+                      "name": "sum(posted_year)",
+                      "expression": "SUM(`posted_year`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1d0c0cb7716499624e92ec0c4a422/datasets/01f1d0c966641ff1b28bdaf32be84c68_posted_year",
+                "query": {
+                  "datasetName": "856d73e4",
+                  "fields": [
+                    {
+                      "name": "posted_year",
+                      "expression": "`posted_year`"
+                    },
+                    {
+                      "name": "posted_year_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "scale": {
+                "type": "categorical",
+                "sort": {
+                  "by": "measure",
+                  "measure": {
+                    "fieldName": "sum(posted_year)",
+                    "queryName": "dashboards/01f1d0c0cb7716499624e92ec0c4a422/datasets/01f1d0c141e21ee8bcdc65102ea1ae00_posted_year"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "posted_year",
+                    "queryName": "dashboards/01f1d0c0cb7716499624e92ec0c4a422/datasets/01f1d0c141e21ee8bcdc65102ea1ae00_posted_year"
+                  },
+                  {
+                    "fieldName": "posted_year",
+                    "queryName": "dashboards/01f1d0c0cb7716499624e92ec0c4a422/datasets/01f1d0c966641ff1b28bdaf32be84c68_posted_year"
+                  }
+                ]
+              }
+            },
+            "filterSources": {
+              "mode": "EXCLUDE",
+              "page": {
+                "names": [
+                  "technologies-by-year"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "technologies-by-year",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8b63e626",
+                  "fields": [
+                    {
+                      "name": "skill",
+                      "expression": "`skill`"
+                    },
+                    {
+                      "name": "total_posts",
+                      "expression": "`total_posts`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Technologies by Year",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "skill",
+                    "contentAlignment": "left",
+                    "style": {
+                      "type": "basic",
+                      "rules": [
+                        {
+                          "condition": {
+                            "operator": "="
+                          },
+                          "backgroundColor": "#00A972"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "fieldName": "total_posts",
+                    "contentAlignment": "left"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "technology-distribution-by-year",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "856d73e4",
+                  "fields": [
+                    {
+                      "name": "sum(total_posts)",
+                      "expression": "SUM(`total_posts`)"
+                    },
+                    {
+                      "name": "skill",
+                      "expression": "`skill`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Technology Distribution by Year",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(total_posts)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "skill",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
