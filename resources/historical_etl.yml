@@ -1,0 +1,45 @@
+resources:
+  jobs:
+    Job_1_Historical_ETL:
+      name: Job 1 – Historical ETL
+      trigger:
+        pause_status: UNPAUSED
+        file_arrival:
+          url: /Volumes/job_market/landing/raw_files/hacker_news/
+          wait_after_last_change_seconds: 120
+      tasks:
+        - task_key: Bronze
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/bronze/01_historical_data_ingestion
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: Silver
+          depends_on:
+            - task_key: Bronze
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/silver/01_historical_data_cleaned
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: Quality_Check
+          depends_on:
+            - task_key: Silver
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/silver/02_hn_quality_checks
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: Unification
+          depends_on:
+            - task_key: Quality_Check
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/silver/05_unify_hacker_news
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: Gold
+          depends_on:
+            - task_key: Unification
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/gold/02_api_gold_analyse
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+      queue:
+        enabled: true

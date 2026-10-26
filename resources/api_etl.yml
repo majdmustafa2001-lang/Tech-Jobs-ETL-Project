@@ -1,0 +1,70 @@
+resources:
+  jobs:
+    Job_2_API_ETL:
+      name: Job 2 – API ETL
+      trigger:
+        pause_status: UNPAUSED
+        periodic:
+          interval: 1
+          unit: WEEKS
+      tasks:
+        - task_key: api_extract
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/bronze/03_api_extract
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: check_new_posts
+          depends_on:
+            - task_key: api_extract
+          condition_task:
+            op: GREATER_THAN
+            left: "{{tasks.api_extract.values.new_posts}}"
+            right: "0"
+        - task_key: api_bronze
+          depends_on:
+            - task_key: check_new_posts
+              outcome: "true"
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/bronze/02_json_data_ingestion
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: api_silver
+          depends_on:
+            - task_key: api_bronze
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/silver/03_json_cleaning
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: api_enrichment
+          depends_on:
+            - task_key: api_silver
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/silver/04_skills_enrichment
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: unification
+          depends_on:
+            - task_key: api_enrichment
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/silver/05_unify_hacker_news
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: gold_analytics
+          depends_on:
+            - task_key: unification
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/job-markt/gold/02_api_gold_analyse
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+      job_clusters:
+        - job_cluster_key: job-cluster-ETL-process
+          new_cluster:
+            cluster_name: ""
+            spark_version: 18.x-scala2.13
+            node_type_id: Standard_DC4as_v5
+            data_security_mode: DATA_SECURITY_MODE_STANDARD
+            runtime_engine: STANDARD
+            kind: CLASSIC_PREVIEW
+            is_single_node: true
+      queue:
+        enabled: true
