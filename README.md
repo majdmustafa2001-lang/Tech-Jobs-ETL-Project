@@ -22,6 +22,18 @@ flowchart TD
     HN --> HD[Tech Job Market Evolution dashboard]
 ```
 
+### Pipeline execution graphs
+
+The screenshots below show the actual Databricks workflow graphs from the October 2026 project tests. The Greenhouse pipeline is a triggered Lakeflow Spark Declarative Pipeline with streaming Bronze/Silver transformations, SCD Type 2 and Gold materialized views. The Hacker News graph illustrates notebook-based ingestion, quality checks, conditional API processing and the downstream analytical workflow.
+
+**Greenhouse – Lakeflow Spark Declarative Pipeline**
+
+![Greenhouse SDP pipeline graph](resources/docs/greenhouse_etl_pipeline.png)
+
+**Hacker News – Lakeflow Job**
+
+![Hacker News ETL workflow graph](resources/docs/hacker_etl_pipeline.png)
+
 **Medallion design**
 
 - **Landing:** Original API responses in immutable, timestamped JSON snapshot files in ADLS Gen2.
