@@ -162,7 +162,7 @@ The SDP pipeline currently uses Serverless compute, while the extractor uses an 
 - **Source quality matters:** Greenhouse companies encode location and work arrangement differently. Preserve `Unknown` when classification is uncertain.
 - **Deletion detection is deferred:** Full-snapshot comparison and safe publication/approval are future work. `__END_AT IS NULL` currently means *last known current state*, not proof the job is still published.
 - **Operational hardening pending:** Idempotency under extractor retries, atomic multi-company snapshot publication, automated quality assertions, monitoring, and deployment portability need additional work.
-- **CI/CD pending:** The repository contains exported Lakeflow Job configuration, but full Databricks Declarative Automation Bundles and automated GitHub Actions checks are not yet configured.
+- **CI baseline available:** GitHub Actions runs offline source-contract checks on pushes and pull requests (notebook Python syntax, YAML, SQL structure and job dependencies). Portable Databricks Declarative Automation Bundles and authenticated deployment/CD are still pending.
 
 ## Status / next steps
 
