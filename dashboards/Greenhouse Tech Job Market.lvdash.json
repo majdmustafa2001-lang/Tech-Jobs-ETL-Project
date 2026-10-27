@@ -1,0 +1,764 @@
+{
+  "datasets": [
+    {
+      "name": "ed225f17",
+      "displayName": "jobs_by_company_category",
+      "queryLines": [
+        "\r\n",
+        "SELECT\r\n",
+        "    board_token,\r\n",
+        "    'Tech' AS job_category,\r\n",
+        "    COUNT(*) AS job_count\r\n",
+        "FROM job_market.gold.greenhouse_current_tech_jobs\r\n",
+        "GROUP BY board_token\r\n",
+        "\r\n",
+        "UNION ALL\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    board_token,\r\n",
+        "    'Other' AS job_category,\r\n",
+        "    COUNT(*) AS job_count\r\n",
+        "FROM job_market.gold.greenhouse_current_other_jobs\r\n",
+        "GROUP BY board_token;\r\n"
+      ]
+    },
+    {
+      "name": "469012cd",
+      "displayName": "Current Tech Job Counts by Role Family",
+      "queryLines": [
+        "\r\n",
+        "SELECT\r\n",
+        "    role_family,\r\n",
+        "    COUNT(*) AS job_count\r\n",
+        "FROM job_market.gold.greenhouse_current_tech_jobs\r\n",
+        "GROUP BY role_family\r\n",
+        "ORDER BY job_count DESC;\r\n"
+      ]
+    },
+    {
+      "name": "fd7ead6e",
+      "displayName": "job_market_kpis",
+      "queryLines": [
+        "\r\n",
+        "WITH tech AS (\r\n",
+        "    SELECT COUNT(*) AS tech_jobs\r\n",
+        "    FROM job_market.gold.greenhouse_current_tech_jobs\r\n",
+        "),\r\n",
+        "\r\n",
+        "other AS (\r\n",
+        "    SELECT COUNT(*) AS other_jobs\r\n",
+        "    FROM job_market.gold.greenhouse_current_other_jobs\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    tech_jobs + other_jobs AS total_jobs,\r\n",
+        "    tech_jobs,\r\n",
+        "    ROUND(\r\n",
+        "        100.0 * tech_jobs /\r\n",
+        "        NULLIF(tech_jobs + other_jobs, 0),\r\n",
+        "        1\r\n",
+        "    ) AS tech_percentage\r\n",
+        "\r\n",
+        "FROM tech\r\n",
+        "CROSS JOIN other;\r\n"
+      ]
+    },
+    {
+      "name": "8d6e2763",
+      "displayName": "work_arrangement_by_company",
+      "queryLines": [
+        "\r\n",
+        "WITH base AS (\r\n",
+        "    SELECT\r\n",
+        "        g.board_token,\r\n",
+        "        g.job_id,\r\n",
+        "        g.location_raw,\r\n",
+        "\r\n",
+        "        LOWER(\r\n",
+        "            CAST(\r\n",
+        "                TRY_ELEMENT_AT(\r\n",
+        "                    FILTER(\r\n",
+        "                        s.job_metadata,\r\n",
+        "                        x -> LOWER(TRIM(x.name)) = 'location type'\r\n",
+        "                    ),\r\n",
+        "                    1\r\n",
+        "                ).value AS STRING\r\n",
+        "            )\r\n",
+        "        ) AS location_type\r\n",
+        "\r\n",
+        "    FROM job_market.gold.greenhouse_current_tech_jobs g\r\n",
+        "\r\n",
+        "    LEFT JOIN job_market.silver.greenhouse_jobs_scd2 s\r\n",
+        "        ON g.board_token = s.board_token\r\n",
+        "       AND g.job_id = s.job_id\r\n",
+        "       AND s.__END_AT IS NULL\r\n",
+        "),\r\n",
+        "\r\n",
+        "classified AS (\r\n",
+        "    SELECT\r\n",
+        "        board_token,\r\n",
+        "        job_id,\r\n",
+        "\r\n",
+        "        CASE\r\n",
+        "            -- Explizite Metadata bevorzugen\r\n",
+        "            WHEN location_type LIKE '%hybrid%'\r\n",
+        "                THEN 'Hybrid'\r\n",
+        "\r\n",
+        "            WHEN location_type RLIKE r'in-office|on-site|onsite'\r\n",
+        "                THEN 'On-Site'\r\n",
+        "\r\n",
+        "            WHEN location_type LIKE '%remote%'\r\n",
+        "                THEN 'Remote'\r\n",
+        "\r\n",
+        "            -- Fallback auf location_raw\r\n",
+        "            WHEN LOWER(location_raw) LIKE '%remote-friendly%'\r\n",
+        "                THEN 'Remote-friendly / Travel'\r\n",
+        "\r\n",
+        "            WHEN LOWER(location_raw) RLIKE r'\\bhybrid\\b'\r\n",
+        "                THEN 'Hybrid'\r\n",
+        "\r\n",
+        "            WHEN LOWER(location_raw) RLIKE r'in-office|on-site|onsite'\r\n",
+        "                THEN 'On-Site'\r\n",
+        "\r\n",
+        "            WHEN LOWER(location_raw) RLIKE r'\\bremote\\b'\r\n",
+        "                THEN 'Remote'\r\n",
+        "\r\n",
+        "            WHEN LOWER(TRIM(location_raw)) = 'distributed'\r\n",
+        "                THEN 'Distributed'\r\n",
+        "\r\n",
+        "            ELSE 'Unknown'\r\n",
+        "        END AS work_arrangement\r\n",
+        "\r\n",
+        "    FROM base\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    board_token,\r\n",
+        "    work_arrangement,\r\n",
+        "    COUNT(*) AS job_count,\r\n",
+        "\r\n",
+        "    ROUND(\r\n",
+        "        100.0 * COUNT(*) /\r\n",
+        "        SUM(COUNT(*)) OVER (\r\n",
+        "            PARTITION BY board_token\r\n",
+        "        ),\r\n",
+        "        1\r\n",
+        "    ) AS percentage\r\n",
+        "\r\n",
+        "FROM classified\r\n",
+        "\r\n",
+        "GROUP BY\r\n",
+        "    board_token,\r\n",
+        "    work_arrangement\r\n",
+        "\r\n",
+        "ORDER BY\r\n",
+        "    board_token,\r\n",
+        "    job_count DESC;\r\n"
+      ]
+    },
+    {
+      "name": "6860207e",
+      "displayName": "tech_jobs_by_country",
+      "queryLines": [
+        "\r\n",
+        "WITH office_locations AS (\r\n",
+        "    SELECT\r\n",
+        "        g.board_token,\r\n",
+        "        g.job_id,\r\n",
+        "        LOWER(\r\n",
+        "            CONCAT_WS(\r\n",
+        "                ' ',\r\n",
+        "                COALESCE(o.office.name, ''),\r\n",
+        "                COALESCE(o.office.location, '')\r\n",
+        "            )\r\n",
+        "        ) AS office_text\r\n",
+        "\r\n",
+        "    FROM job_market.gold.greenhouse_current_tech_jobs g,\r\n",
+        "    LATERAL explode_outer(g.offices) AS o(office)\r\n",
+        "),\r\n",
+        "\r\n",
+        "classified AS (\r\n",
+        "    SELECT\r\n",
+        "        board_token,\r\n",
+        "        job_id,\r\n",
+        "\r\n",
+        "        CASE\r\n",
+        "            WHEN office_text RLIKE r'\\b(germany|deutschland)\\b'\r\n",
+        "                THEN 'Germany'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\b(united states|usa|us)\\b'\r\n",
+        "                THEN 'United States'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\b(united kingdom|uk|england)\\b'\r\n",
+        "                THEN 'United Kingdom'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\bcanada\\b'\r\n",
+        "                THEN 'Canada'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\bfrance\\b'\r\n",
+        "                THEN 'France'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\bindia\\b'\r\n",
+        "                THEN 'India'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\b(south korea|korea)\\b'\r\n",
+        "                THEN 'South Korea'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\bsingapore\\b'\r\n",
+        "                THEN 'Singapore'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\bjapan\\b'\r\n",
+        "                THEN 'Japan'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\baustralia\\b'\r\n",
+        "                THEN 'Australia'\r\n",
+        "\r\n",
+        "            WHEN office_text RLIKE r'\\bnetherlands\\b'\r\n",
+        "                THEN 'Netherlands'\r\n",
+        "\r\n",
+        "            WHEN TRIM(office_text) = ''\r\n",
+        "                THEN 'Unknown'\r\n",
+        "\r\n",
+        "            ELSE 'Other / Unclassified'\r\n",
+        "        END AS country\r\n",
+        "\r\n",
+        "    FROM office_locations\r\n",
+        "),\r\n",
+        "\r\n",
+        "unique_job_countries AS (\r\n",
+        "    SELECT DISTINCT\r\n",
+        "        board_token,\r\n",
+        "        job_id,\r\n",
+        "        country\r\n",
+        "    FROM classified\r\n",
+        ")\r\n",
+        "\r\n",
+        "SELECT\r\n",
+        "    country,\r\n",
+        "    board_token,\r\n",
+        "    COUNT(*) AS job_count\r\n",
+        "\r\n",
+        "FROM unique_job_countries\r\n",
+        "\r\n",
+        "GROUP BY country, board_token\r\n",
+        "\r\n",
+        "ORDER BY job_count DESC;\r\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "3b5f9b5a",
+      "displayName": "Tech vs. Other Jobs by Company",
+      "layout": [
+        {
+          "widget": {
+            "name": "tech-vs-other-jobs-by-company",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ed225f17",
+                  "fields": [
+                    {
+                      "name": "job_category",
+                      "expression": "`job_category`"
+                    },
+                    {
+                      "name": "board_token",
+                      "expression": "`board_token`"
+                    },
+                    {
+                      "name": "sum(job_count)",
+                      "expression": "SUM(`job_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"text-align:center;display:block;\">Tech vs. Other Jobs by Company</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "board_token",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(job_count)",
+                  "displayName": "job_count",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "job_category",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Tech",
+                        "color": "#C98907"
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "tech-jobs-by-role-family",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "469012cd",
+                  "fields": [
+                    {
+                      "name": "sum(job_count)",
+                      "expression": "SUM(`job_count`)"
+                    },
+                    {
+                      "name": "role_family",
+                      "expression": "`role_family`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"text-align:center;display:block;\">Tech Jobs by Role Family</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(job_count)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "job_count ",
+                  "scale": {
+                    "type": "quantitative",
+                    "reverse": false
+                  }
+                },
+                "y": {
+                  "fieldName": "role_family",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "tech-jobs1",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fd7ead6e",
+                  "fields": [
+                    {
+                      "name": "sum(tech_jobs)",
+                      "expression": "SUM(`tech_jobs`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"text-align:center;display:block;\">Tech Jobs</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(tech_jobs)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "tech-share",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fd7ead6e",
+                  "fields": [
+                    {
+                      "name": "sum(tech_percentage)",
+                      "expression": "SUM(`tech_percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"text-align:center;display:block;\">Tech Share</span>\n<p>&nbsp;</p>\n",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(tech_percentage)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "total-jobs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fd7ead6e",
+                  "fields": [
+                    {
+                      "name": "sum(total_jobs)",
+                      "expression": "SUM(`total_jobs`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"text-align:center;display:block;\">Total Jobs</span>",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_jobs)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "94b9a220",
+      "displayName": "Untitled page",
+      "layout": [
+        {
+          "widget": {
+            "name": "work-arrangement-tech-jobs-company",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "8d6e2763",
+                  "fields": [
+                    {
+                      "name": "work_arrangement",
+                      "expression": "`work_arrangement`"
+                    },
+                    {
+                      "name": "sum(job_count)",
+                      "expression": "SUM(`job_count`)"
+                    },
+                    {
+                      "name": "board_token",
+                      "expression": "`board_token`"
+                    },
+                    {
+                      "name": "sum(percentage)",
+                      "expression": "SUM(`percentage`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "<span style=\"text-align:center;display:block;\">Work Arrangement of Tech Jobs by Company</span>",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "board_token",
+                  "axis": {
+                    "hideLabels": false
+                  },
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(percentage)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "all"
+                    },
+                    "significantFigures": {
+                      "type": "all"
+                    }
+                  },
+                  "displayName": "percentage",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "work_arrangement",
+                  "scale": {
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "Unknown",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 7
+                        }
+                      }
+                    ]
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "sum(job_count)",
+                    "displayName": "jobs"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "36d78bfc",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6860207e",
+                  "fields": [
+                    {
+                      "name": "board_token",
+                      "expression": "`board_token`"
+                    },
+                    {
+                      "name": "sum(job_count)",
+                      "expression": "SUM(`job_count`)"
+                    },
+                    {
+                      "name": "country",
+                      "expression": "`country`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(job_count)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "country",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "board_token",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "c7cdc2cf",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"font-weight: 500;\">Greenhouse job postings collected through an automated Azure Databricks pipeline. Results reflect the latest known job states. Technical role classification, work arrangements and geographic assignments are derived from job titles and available source metadata. Automatic job removal detection is not yet implemented.</span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#FAFAFB",
+        "dark": "#1F272D"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#11171C"
+      },
+      "fontColor": {
+        "light": "#11171C",
+        "dark": "#E8ECF0"
+      },
+      "selectionColor": {
+        "light": "#2272B4",
+        "dark": "#86CEF7"
+      },
+      "widgetHeaderAlignment": "LEFT",
+      "widgetShadow": 0
+    },
+    "applyModeEnabled": false
+  }
+}
