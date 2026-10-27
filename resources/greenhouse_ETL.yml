@@ -1,0 +1,21 @@
+resources:
+  jobs:
+    greenhouse_etl_job:
+      name: greenhouse_etl_job
+      tasks:
+        - task_key: greenhouse_api_extract
+          notebook_task:
+            notebook_path: /Workspace/Users/majdmustafa2001@gmail.com/Tech-Jobs-ETL-Project/bronze/04_greenhouse_api_extract
+            source: WORKSPACE
+          existing_cluster_id: 1024-041431-iwd3qpx8
+        - task_key: greanhause_Pipeline
+          depends_on:
+            - task_key: greenhouse_api_extract
+          pipeline_task:
+            pipeline_id: 92ce691a-d62d-4012-a0c0-429d515dca66
+      queue:
+        enabled: true
+      parameters:
+        - name: boards
+          default: anthropic,cloudflare,figma
+      performance_target: PERFORMANCE_OPTIMIZED
