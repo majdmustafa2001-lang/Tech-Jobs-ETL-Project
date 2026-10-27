@@ -76,6 +76,23 @@ class RepositoryChecks(unittest.TestCase):
         self.assertEqual(fanout.upper().count("CREATE OR REFRESH MATERIALIZED VIEW"), 2)
         self.assertIn("greenhouse_quarantine", fanout)
 
+    
+def test_bronze_notebooks_exist(self):
+    files = (
+        "01_historical_data_ingestion.ipynb",
+        "02_json_data_ingestion.ipynb",
+        "03_hacker_api_extract.ipynb",
+        "04_greenhouse_api_extract.ipynb"
+    )
+
+    for name in files:
+        path = ROOT / "bronze" / name
+        self.assertTrue(
+            path.is_file(),
+            f"Missing file: {path}"
+        )
+
+
 
 if __name__ == "__main__":
     unittest.main()
