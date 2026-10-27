@@ -62,16 +62,16 @@ The Greenhouse extractor accepts a comma-separated `boards` parameter. It was te
 5. `scd2.sql` stores initial states and relevant subsequent attribute changes, without creating a new SCD2 version solely because a new snapshot arrived.
 6. `fanout.sql` defines the current Tech and Other **Gold materialized views**, plus a Silver quarantine streaming table. The Gold views keep one current row per company/job ID.
 
-**Important distinction:** Auto Loader is incremental at the *file* level; Greenhouse API requests are still *full snapshots*. SCD2 tracks observed changes in selected job attributes. The pipeline does **not yet detect job removals**: a job that disappears from the source may remain in the last-known-current Gold view. Snapshot publication is also not yet fully transactional across all company files.
+**Important distinction:** Auto Loader is incremental at the *file* level; Greenhouse API requests are still *full snapshots*. SCD2 tracks observed changes in selected job attributes. The pipeline does **not yet detect job removals**: a job that disappears from the source may remain in the last-known-current Gold view.
 
 ## Technical stack
 
 - Azure Databricks, Lakeflow Jobs, Lakeflow Spark Declarative Pipelines (SQL)
 - Apache Spark / PySpark and SQL
-- Delta Lake: `MERGE`, SCD Type 2, Change Data Feed (CDF), Time Travel
+- Delta Lake: SCD Type 2 with `AUTO CDC INTO`, Change Data Feed (CDF), Time Travel
 - Azure Data Lake Storage Gen2 and Unity Catalog volumes, catalogs, and schemas
 - Databricks AI/BI dashboards
-- Git and GitHub (CI/CD deployment work in progress)
+- Git and GitHub for version control and branching
 
 ## Greenhouse datasets
 
@@ -116,9 +116,9 @@ The following results were observed during development on **27 October 2026**; t
 
 - Four configured Greenhouse boards processed successfully using the same extractor and SQL transformation definitions.
 - Gold current-state counts: **Anthropic 679**, **Cloudflare 465**, **Figma 141**, **Greenhouse 18** (**1,303** in total).
-- The SCD2 table had **1,309 total historical rows** after the later merge; the difference from 1,303 current rows reflects previous historical versions.
+- The SCD2 table had **1,309 total historical rows** after the subsequent pipeline update; the difference from 1,303 current rows reflects previous historical versions.
 - An initial Delta CDF read of SCD2 commit version **2** returned **1,279 `insert` events**.
-- Delta Time Travel successfully compared the table before and after the later merge (versions **2** and **3**); an additional `OPTIMIZE` operation created version **4** without changing the logical job count.
+- Delta Time Travel successfully compared table versions **2** and **3** before and after a subsequent SCD2 update; an additional `OPTIMIZE` operation created version **4** without changing the logical job count.
 - The Hacker News API workflow condition correctly skipped downstream processing when there were no new posts.
 
 Example read-only checks:
@@ -173,8 +173,6 @@ The SDP pipeline currently uses Serverless compute, while the extractor uses an 
 - **Separate raw observations from current-state analytics:** Do not count the append-only Silver snapshot table as a unique current-job count.
 - **Source quality matters:** Greenhouse companies encode location and work arrangement differently. Preserve `Unknown` when classification is uncertain.
 - **Deletion detection is deferred:** Full-snapshot comparison and safe publication/approval are future work. `__END_AT IS NULL` currently means *last known current state*, not proof the job is still published.
-- **Operational hardening pending:** Idempotency under extractor retries, atomic multi-company snapshot publication, automated quality assertions, monitoring, and deployment portability need additional work.
-- **CI baseline available:** GitHub Actions runs offline source-contract checks on pushes and pull requests (notebook Python syntax, YAML, SQL structure and job dependencies). Portable Databricks Declarative Automation Bundles and authenticated deployment/CD are still pending.
 
 ## Status / next steps
 
@@ -185,8 +183,6 @@ The SDP pipeline currently uses Serverless compute, while the extractor uses an 
 - [x] SCD Type 2 job history and CDF / Time Travel verification
 - [x] Current-state Gold materialized views and AI/BI dashboard
 - [x] Lakeflow orchestration and GitHub source control
-- [ ] Portable Databricks bundle configuration and CI validation
-- [ ] Monitoring, recovery, and safer snapshot publication
 - [ ] Reliable removal detection for closed job postings
 
 **Data interpretation:** Job boards reflect selected sources and companies, not the entire labor market. Observed first-publication dates, last-updated dates, and our snapshot collection timestamps represent different concepts and must not be conflated.
